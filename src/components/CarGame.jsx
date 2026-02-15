@@ -21,6 +21,8 @@ const CarGame = () => {
     const [lives, setLives] = useState(3);
     const [timeLeft, setTimeLeft] = useState(180);
     const [countDown, setCountDown] = useState(3);
+    const [zoneName, setZoneName] = useState('NATURE');
+    const [showZoneNotify, setShowZoneNotify] = useState(false);
 
     // Refs
     const sceneRef = useRef(null);
@@ -34,6 +36,7 @@ const CarGame = () => {
     const activeKeys = useRef({});
     const animationRef = useRef(null);
     const speedRef = useRef(0);
+    const envZone = useRef('NATURE');
 
     // Audio Refs
     const audioMenuRef = useRef(new Audio(musicMenu));
@@ -106,13 +109,13 @@ const CarGame = () => {
     }, [gameState, audioEnabled]);
 
     useEffect(() => {
-        if (!canvasRef.current || sceneRef.current) return;
+        // SCENE SETUP (Only if not already created)
+        if (sceneRef.current) return;
 
-        // SCENE SETUP
         const scene = new THREE.Scene();
         const skyColor = 0x4a6fa5;
         scene.background = new THREE.Color(skyColor);
-        scene.fog = new THREE.Fog(skyColor, 40, 250);
+        scene.fog = new THREE.Fog(skyColor, 40, 350);
 
         // CAMERA - DYNAMIC POSITION
         const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -301,18 +304,108 @@ const CarGame = () => {
         curbR.position.set((ROAD_WIDTH / 2 + 0.5), 0.25, 0);
         segmentGroup.add(curbR);
 
-        // Trees
-        for (let i = 0; i < 2; i++) {
-            const tree = new THREE.Group();
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2), new THREE.MeshStandardMaterial({ color: 0x5C4033 }));
-            trunk.position.y = 1;
-            tree.add(trunk);
-            const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(2), new THREE.MeshStandardMaterial({ color: 0x228B22, flatShading: true }));
-            leaves.position.y = 3;
-            tree.add(leaves);
-            const side = Math.random() > 0.5 ? 1 : -1;
-            tree.position.set(side * (20 + Math.random() * 10), 0, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
-            segmentGroup.add(tree);
+        // Helper to get side position
+        const getSidePos = (minDist = 18, maxDist = 40) => (minDist + Math.random() * (maxDist - minDist)) * (Math.random() > 0.5 ? 1 : -1);
+
+        // NATURE PROPS
+        if (envZone.current === 'NATURE' || envZone.current === 'TRANSITION') {
+            const numTrees = envZone.current === 'NATURE' ? 4 : 2;
+            for (let i = 0; i < numTrees; i++) {
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2), new THREE.MeshStandardMaterial({ color: 0x5C4033 }));
+                trunk.position.y = 1;
+                tree.add(trunk);
+                const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(2 + Math.random()), new THREE.MeshStandardMaterial({ color: 0x228B22, flatShading: true }));
+                leaves.position.y = 3;
+                tree.add(leaves);
+                tree.position.set(getSidePos(18, 50), 0, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                segmentGroup.add(tree);
+            }
+
+            // Bushes
+            for (let i = 0; i < 3; i++) {
+                const bush = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.8 + Math.random() * 0.5),
+                    new THREE.MeshStandardMaterial({ color: 0x1a5e1a, flatShading: true })
+                );
+                bush.position.set(getSidePos(14, 25), 0.5, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                segmentGroup.add(bush);
+            }
+
+            // Rocks
+            if (Math.random() > 0.5) {
+                const rock = new THREE.Mesh(
+                    new THREE.IcosahedronGeometry(1.5, 0),
+                    new THREE.MeshStandardMaterial({ color: 0x888888, flatShading: true })
+                );
+                rock.position.set(getSidePos(20, 35), 0.5, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                rock.rotation.set(Math.random(), Math.random(), Math.random());
+                segmentGroup.add(rock);
+            }
+        }
+
+        // CITY PROPS
+        if (envZone.current === 'CITY' || envZone.current === 'TRANSITION') {
+            const density = envZone.current === 'CITY' ? 3 : 1;
+
+            // Street Lamps
+            for (let i = 0; i < density; i++) {
+                const lamp = new THREE.Group();
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 8), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+                pole.position.y = 4;
+                lamp.add(pole);
+
+                const top = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.4, 0.8), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+                top.position.set(0.6, 7.8, 0);
+                lamp.add(top);
+
+                const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.3), new THREE.MeshBasicMaterial({ color: 0xffffaa }));
+                bulb.position.set(1.2, 7.6, 0);
+                lamp.add(bulb);
+
+                const side = Math.random() > 0.5 ? 1 : -1;
+                lamp.position.set(side * 14.5, 0, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                lamp.rotation.y = side > 0 ? 0 : Math.PI;
+                segmentGroup.add(lamp);
+            }
+
+            // Neon Billboards
+            if (Math.random() > 0.4) {
+                const bb = new THREE.Group();
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 12), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+                frame.position.y = 8;
+                bb.add(frame);
+
+                const colors = [0x00ffff, 0xff00ff, 0xffff00, 0x00ff00];
+                const glow = new THREE.Mesh(
+                    new THREE.PlaneGeometry(11, 5),
+                    new THREE.MeshBasicMaterial({ color: colors[Math.floor(Math.random() * colors.length)], side: THREE.DoubleSide })
+                );
+                glow.position.set(0.3, 8, 0);
+                glow.rotation.y = Math.PI / 2;
+                bb.add(glow);
+
+                const legs = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 0.3), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+                legs.position.y = 2.5;
+                bb.add(legs);
+
+                bb.position.set(getSidePos(25, 35), 0, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                segmentGroup.add(bb);
+            }
+
+            // Buildings in the city zone
+            if (envZone.current === 'CITY') {
+                for (let i = 0; i < 4; i++) {
+                    const h = 40 + Math.random() * 60;
+                    const w = 15 + Math.random() * 15;
+                    const b = new THREE.Mesh(
+                        new THREE.BoxGeometry(w, h, w),
+                        new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 0.3, metalness: 0.7 })
+                    );
+                    b.position.set(getSidePos(40, 100), h / 2 - 2, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                    segmentGroup.add(b);
+                }
+            }
         }
 
         // ITEMS
@@ -423,7 +516,7 @@ const CarGame = () => {
                     }
                 }
             }
-            composerRef.current.render();
+            if (composerRef.current) composerRef.current.render();
             animationRef.current = requestAnimationFrame(animate);
         };
         animate();
@@ -433,7 +526,42 @@ const CarGame = () => {
     useEffect(() => {
         let interval;
         if (gameState === 'COUNTDOWN') interval = setInterval(() => setCountDown(p => p === 1 ? (setGameState('PLAYING'), 0) : p - 1), 1000);
-        else if (gameState === 'PLAYING') interval = setInterval(() => setTimeLeft(p => p <= 0 ? (setGameState('GAME_OVER'), 0) : p - 1), 1000);
+        else if (gameState === 'PLAYING') {
+            interval = setInterval(() => {
+                setTimeLeft(p => {
+                    const next = p - 1;
+                    if (next <= 0) {
+                        setGameState('GAME_OVER');
+                        return 0;
+                    }
+
+                    // ZONE RADIUS TRANSITION
+                    // Start at 180s. 
+                    // 180-135: NATURE
+                    // 135-120: TRANSITION
+                    // 120-0: CITY
+                    if (next > 135) {
+                        if (envZone.current !== 'NATURE') envZone.current = 'NATURE';
+                    } else if (next > 120) {
+                        if (envZone.current !== 'TRANSITION') {
+                            envZone.current = 'TRANSITION';
+                            setZoneName('APPROACHING CITY');
+                            setShowZoneNotify(true);
+                            setTimeout(() => setShowZoneNotify(false), 3000);
+                        }
+                    } else {
+                        if (envZone.current !== 'CITY') {
+                            envZone.current = 'CITY';
+                            setZoneName('NEO-CITY ARCHIVE');
+                            setShowZoneNotify(true);
+                            setTimeout(() => setShowZoneNotify(false), 3000);
+                        }
+                    }
+
+                    return next;
+                });
+            }, 1000);
+        }
         return () => clearInterval(interval);
     }, [gameState]);
 
@@ -500,16 +628,81 @@ const CarGame = () => {
                         </div>
                     )}
 
-                    <button onClick={() => {
-                        setGameState('COUNTDOWN');
-                        setLives(3); setScore(0); setTimeLeft(180); setCountDown(3);
-                        speedRef.current = 0; activeKeys.current = {};
-                    }}
+                    <button onClick={() => setGameState('SELECT_ENV')}
                         className="group relative px-10 py-5 md:px-20 md:py-8 bg-cyan-600/20 text-cyan-400 text-xl md:text-4xl font-black rounded-xl border-2 border-cyan-400/50 shadow-[0_0_20px_rgba(0,255,255,0.2)] hover:bg-cyan-400 hover:text-black hover:scale-105 hover:shadow-[0_0_40px_rgba(0,255,255,0.6)] transition-all overflow-hidden w-full max-w-xs md:max-w-none">
                         <span className="relative z-10 flex items-center justify-center gap-3 md:gap-4">
                             <FaPlay /> START ENGINE
                         </span>
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1s_infinite]"></div>
+                    </button>
+                </div>
+            )}
+
+            {/* ENVIRONMENT SELECTION */}
+            {gameState === 'SELECT_ENV' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-2xl z-50 px-4">
+                    <h2 className="text-4xl md:text-6xl font-black text-white mb-10 drop-shadow-glow italic uppercase tracking-tighter text-center">
+                        Choose Your <span className="text-cyan-400">Sector</span>
+                    </h2>
+
+                    <div className="flex flex-col md:flex-row gap-6 w-full max-w-5xl h-[60vh] md:h-auto">
+                        {/* FOREST CARD */}
+                        <div onClick={() => {
+                            envZone.current = 'NATURE';
+                            setGameState('COUNTDOWN');
+                            setLives(3); setScore(0); setTimeLeft(180); setCountDown(3);
+                            speedRef.current = 0; activeKeys.current = {};
+                            // Reset segments for new environment
+                            if (sceneRef.current) {
+                                roadSegments.current.forEach(s => sceneRef.current.remove(s));
+                                roadSegments.current = [];
+                                coins.current = [];
+                                fires.current = [];
+                                for (let i = 0; i < NUM_SEGMENTS; i++) spawnSegment(i * SEGMENT_LENGTH);
+                            }
+                        }}
+                            className="flex-1 group relative rounded-3xl overflow-hidden border-2 border-green-500/30 hover:border-green-400 transition-all cursor-pointer shadow-2xl bg-gradient-to-b from-green-900/20 to-black/80">
+                            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80')] bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-700 opacity-40 group-hover:opacity-60 scale-110 group-hover:scale-100"></div>
+                            <div className="relative h-full p-8 flex flex-col justify-end">
+                                <div className="text-green-400 font-mono text-sm mb-2 tracking-[0.3em]">ZONE_01</div>
+                                <h3 className="text-3xl md:text-5xl font-black text-white leading-none mb-4">THE GREEN<br />FOREST</h3>
+                                <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-xs group-hover:text-white transition-colors">Start in lush nature and transition to the city as you pick up speed.</p>
+                                <div className="mt-6 w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center border border-green-500/50 group-hover:bg-green-500 group-hover:text-black transition-all">
+                                    <FaPlay className="ml-1" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CITY CARD */}
+                        <div onClick={() => {
+                            envZone.current = 'CITY';
+                            setGameState('COUNTDOWN');
+                            setLives(3); setScore(0); setTimeLeft(180); setCountDown(3);
+                            speedRef.current = 0; activeKeys.current = {};
+                            // Reset segments for new environment
+                            if (sceneRef.current) {
+                                roadSegments.current.forEach(s => sceneRef.current.remove(s));
+                                roadSegments.current = [];
+                                coins.current = [];
+                                fires.current = [];
+                                for (let i = 0; i < NUM_SEGMENTS; i++) spawnSegment(i * SEGMENT_LENGTH);
+                            }
+                        }}
+                            className="flex-1 group relative rounded-3xl overflow-hidden border-2 border-cyan-500/30 hover:border-cyan-400 transition-all cursor-pointer shadow-2xl bg-gradient-to-b from-blue-900/20 to-black/80">
+                            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1546410531-bb4caa6b424d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80')] bg-cover bg-center grayscale group-hover:grayscale-0 transition-all duration-700 opacity-40 group-hover:opacity-60 scale-110 group-hover:scale-100"></div>
+                            <div className="relative h-full p-8 flex flex-col justify-end">
+                                <div className="text-cyan-400 font-mono text-sm mb-2 tracking-[0.3em]">ZONE_03</div>
+                                <h3 className="text-3xl md:text-5xl font-black text-white leading-none mb-4">NEO-CITY<br />ARCHIVE</h3>
+                                <p className="text-slate-300 text-sm md:text-base leading-relaxed max-w-xs group-hover:text-white transition-colors">Jump directly into the neon metropolis for a high-intensity urban chase.</p>
+                                <div className="mt-6 w-12 h-12 bg-cyan-500/20 rounded-full flex items-center justify-center border border-cyan-500/50 group-hover:bg-cyan-500 group-hover:text-black transition-all">
+                                    <FaPlay className="ml-1" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onClick={() => setGameState('START')} className="mt-8 text-slate-500 hover:text-white transition-colors font-mono text-xs tracking-widest uppercase">
+                        &lt; Return to Main System
                     </button>
                 </div>
             )}
@@ -524,7 +717,7 @@ const CarGame = () => {
             )}
 
             {/* HUD - SCALED FOR MOBILE */}
-            {gameState !== 'START' && (
+            {gameState !== 'START' && gameState !== 'SELECT_ENV' && (
                 <>
                     <div className="absolute top-0 left-0 w-full p-4 md:p-6 flex justify-between items-start pointer-events-none z-40">
                         <div className="flex flex-col gap-2 md:gap-3 scale-90 origin-top-left md:scale-100">
@@ -546,7 +739,7 @@ const CarGame = () => {
                     </div>
 
                     {gameState === 'PLAYING' && (
-                        <div className="absolute bottom-6 left-0 w-full px-6 flex justify-between items-end pb-safe z-50 md:bottom-10 md:px-10">
+                        <div className="absolute bottom-20 left-0 w-full px-6 flex justify-between items-end pb-safe z-50 md:bottom-10 md:px-10">
                             <div className="flex gap-4">
                                 <Btn icon={<FaArrowLeft />} action="left" />
                                 <Btn icon={<FaArrowRight />} action="right" />
@@ -554,6 +747,16 @@ const CarGame = () => {
                             <div className="flex gap-4">
                                 <Btn icon={<FaArrowDown />} action="back" />
                                 <Btn icon={<FaArrowUp />} action="front" />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ZONE NOTIFICATION */}
+                    {showZoneNotify && (
+                        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-50 text-center animate-pulse">
+                            <div className="text-cyan-400 text-sm md:text-xl font-mono tracking-[0.5em] mb-2">ZONE DETECTED</div>
+                            <div className="text-white text-3xl md:text-6xl font-black italic border-y border-white/20 py-4 px-10 backdrop-blur-sm bg-cyan-500/10">
+                                {zoneName}
                             </div>
                         </div>
                     )}
