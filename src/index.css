@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-brand-dark overflow-hidden;
+  }
+}
+
+/* Custom styles for the map container to ensure it takes full height */
+.map-container {
+  height: 100vh;
+  width: 100vw;
+}
