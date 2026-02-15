@@ -4,8 +4,8 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
 import carImg from '../assets/image.png';
-import { FaArrowLeft, FaArrowRight, FaArrowUp, FaArrowDown, FaPlay, FaRedo, FaVolumeMute, FaVolumeUp } from 'react-icons/fa'; // React Icons
-import { GiTrophyCup } from 'react-icons/gi'; // Game Icon
+import { FaArrowLeft, FaArrowRight, FaArrowUp, FaArrowDown, FaPlay, FaRedo, FaVolumeMute, FaVolumeUp } from 'react-icons/fa';
+import { GiTrophyCup } from 'react-icons/gi';
 
 // AUDIO IMPORTS
 import musicMenu from '../assets/mfcc-speed-speed-racing-cycling-music-257904.mp3';
@@ -41,7 +41,7 @@ const CarGame = () => {
     const audioRace2Ref = useRef(new Audio(musicRace2));
     const audioCoinRef = useRef(new Audio(sfxCoin));
     const audioFireRef = useRef(new Audio(sfxFire));
-    const currentRaceTrack = useRef(1); // 1 or 2
+    const currentRaceTrack = useRef(1);
 
     // Constants
     const SEGMENT_LENGTH = 100;
@@ -58,13 +58,10 @@ const CarGame = () => {
         const race1 = audioRace1Ref.current;
         const race2 = audioRace2Ref.current;
 
-        // Configure Loops/Events
         menuAudio.loop = true;
-
         race1.onended = () => { race1.currentTime = 0; race2.play(); currentRaceTrack.current = 2; };
         race2.onended = () => { race2.currentTime = 0; race1.play(); currentRaceTrack.current = 1; };
 
-        // Preload SFX
         audioCoinRef.current.volume = 0.6;
         audioFireRef.current.volume = 0.8;
 
@@ -77,13 +74,10 @@ const CarGame = () => {
         if (gameState === 'START') {
             stopAll();
             menuAudio.volume = 0.5;
-            // Try to play, if blocked, we wait for user interaction
             const playPromise = menuAudio.play();
             if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    setAudioEnabled(true);
-                }).catch(error => {
-                    console.log("Autoplay prevented. User interaction needed.");
+                playPromise.then(() => setAudioEnabled(true)).catch(error => {
+                    console.log("Autoplay prevented.");
                     setAudioEnabled(false);
                 });
             }
@@ -97,13 +91,8 @@ const CarGame = () => {
         } else if (gameState === 'GAME_OVER') {
             stopAll();
         }
-
-        return () => {
-            // Cleanup on unmount only? 
-        };
     }, [gameState]);
 
-    // GLOBAL UNMUTE HANDLER
     const enableAudio = () => {
         if (!audioEnabled && gameState === 'START') {
             audioMenuRef.current.play();
@@ -119,18 +108,23 @@ const CarGame = () => {
     useEffect(() => {
         if (!canvasRef.current || sceneRef.current) return;
 
-        // 1. SCENE SETUP - EVENING
+        // SCENE SETUP
         const scene = new THREE.Scene();
         const skyColor = 0x4a6fa5;
         scene.background = new THREE.Color(skyColor);
         scene.fog = new THREE.Fog(skyColor, 40, 250);
 
-        // 2. CAMERA
+        // CAMERA - DYNAMIC POSITION
         const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 6, -15);
+
+        // Initial responsive setup
+        const isMobile = window.innerWidth < 768;
+        const isPortrait = window.innerHeight > window.innerWidth;
+        // Adjusted camera for mobile/portrait to show more of the environment
+        camera.position.set(0, isMobile ? 9 : 6, isPortrait ? -35 : (isMobile ? -25 : -15));
         camera.lookAt(0, 0, 25);
 
-        // 3. RENDERER
+        // RENDERER
         const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: false });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -139,7 +133,7 @@ const CarGame = () => {
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 1.0;
 
-        // 4. POST-PROCESSING
+        // POST-PROCESSING
         const renderScene = new RenderPass(scene, camera);
         const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
         bloomPass.threshold = 0.6;
@@ -151,7 +145,7 @@ const CarGame = () => {
         composer.addPass(bloomPass);
         composerRef.current = composer;
 
-        // 5. LIGHTING
+        // LIGHTING
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
@@ -162,21 +156,17 @@ const CarGame = () => {
         dirLight.shadow.mapSize.height = 4096;
         scene.add(dirLight);
 
-        // 6. GROUND
+        // GROUND
         const groundGeo = new THREE.PlaneGeometry(2000, 2000);
-        const groundMat = new THREE.MeshStandardMaterial({
-            color: 0x3b5e3b,
-            roughness: 1, metalness: 0
-        });
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x3b5e3b, roughness: 1, metalness: 0 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = -0.1;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // 7. PLAYER CAR - IMAGE SPRITE WITH BACKGROUND REMOVAL
+        // PLAYER CAR
         const carGroup = new THREE.Group();
-
         const textureLoader = new THREE.TextureLoader();
         textureLoader.load(carImg, (tex) => {
             const img = tex.image;
@@ -207,11 +197,8 @@ const CarGame = () => {
             carGroup.add(carMesh);
         });
 
-        // Shadow blob
         const shadowGeo = new THREE.PlaneGeometry(4, 2);
-        const shadowMat = new THREE.MeshBasicMaterial({
-            color: 0x000000, transparent: true, opacity: 0.6
-        });
+        const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6 });
         const shadow = new THREE.Mesh(shadowGeo, shadowMat);
         shadow.rotation.x = -Math.PI / 2;
         shadow.position.y = 0.05;
@@ -225,19 +212,36 @@ const CarGame = () => {
         rendererRef.current = renderer;
 
         const handleResize = () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            const aspect = width / height;
+
+            camera.aspect = aspect;
+
+            // Adjust FOV slightly for portrait mode to help with horizontal visibility
+            if (aspect < 1) {
+                camera.fov = 65 + (1 - aspect) * 20; // Subtle increase to avoid fish-eye
+            } else {
+                camera.fov = 65;
+            }
             camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
+
+            const isMob = width < 768;
+            const isPortrait = height > width;
+            // Pull camera back further in portrait mode to show road edges
+            camera.position.set(0, isMob ? 9 : 6, isPortrait ? -35 : (isMob ? -25 : -15));
+            camera.lookAt(0, 0, 25);
+
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
         };
         window.addEventListener('resize', handleResize);
+        handleResize(); // Ensure initial camera state is correct for orientation
 
         // Initial Road
-        for (let i = 0; i < NUM_SEGMENTS; i++) {
-            spawnSegment(i * SEGMENT_LENGTH);
-        }
+        for (let i = 0; i < NUM_SEGMENTS; i++) spawnSegment(i * SEGMENT_LENGTH);
 
-        // 8. BACKGROUND CITY
+        // CITY
         const cityGroup = new THREE.Group();
         const buildingMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.6 });
         const windowMat = new THREE.MeshBasicMaterial({ color: 0xffdd88 });
@@ -249,14 +253,8 @@ const CarGame = () => {
             const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), buildingMat);
             const x = (Math.random() - 0.5) * 800;
             if (Math.abs(x) < 50) continue;
-
             b.position.set(x, h / 2 - 5, Math.random() * 800 - 200);
             b.receiveShadow = true;
-            if (Math.random() < 0.3) {
-                const win = new THREE.Mesh(new THREE.PlaneGeometry(w * 0.6, h * 0.8), windowMat);
-                win.position.z = d / 2 + 0.1;
-                b.add(win);
-            }
             cityGroup.add(b);
         }
         scene.add(cityGroup);
@@ -325,14 +323,9 @@ const CarGame = () => {
                 const itemZ = Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2;
 
                 if (Math.random() < 0.3) {
-                    // Fire -> Beacon
                     const obsGroup = new THREE.Group();
                     const coneGeo = new THREE.ConeGeometry(1, 2.5, 32);
-                    const coneMat = new THREE.MeshLambertMaterial({
-                        color: 0xff3300,
-                        emissive: 0xff0000,
-                        emissiveIntensity: 0.4
-                    });
+                    const coneMat = new THREE.MeshLambertMaterial({ color: 0xff3300, emissive: 0xff0000, emissiveIntensity: 0.4 });
                     const cone = new THREE.Mesh(coneGeo, coneMat);
                     cone.position.y = 1.25;
                     obsGroup.add(cone);
@@ -341,15 +334,11 @@ const CarGame = () => {
                     segmentGroup.add(obsGroup);
                     fires.current.push(obsGroup);
                 } else {
-                    // Coin -> Gold
                     const isGold = Math.random() > 0.3;
                     const coinGeo = new THREE.OctahedronGeometry(1, 0);
                     const coinMat = new THREE.MeshStandardMaterial({
-                        color: isGold ? 0xFFD700 : 0xCCCCCC,
-                        metalness: 0.8,
-                        roughness: 0.1,
-                        emissive: isGold ? 0xaa8800 : 0x444444,
-                        emissiveIntensity: 0.4
+                        color: isGold ? 0xFFD700 : 0xCCCCCC, metalness: 0.8, roughness: 0.1,
+                        emissive: isGold ? 0xaa8800 : 0x444444, emissiveIntensity: 0.4
                     });
                     const coin = new THREE.Mesh(coinGeo, coinMat);
                     coin.position.set(laneX, 1.5, itemZ);
@@ -363,7 +352,6 @@ const CarGame = () => {
         roadSegments.current.push(segmentGroup);
     };
 
-    // GAME LOOP
     useEffect(() => {
         if (!sceneRef.current) return;
 
@@ -407,7 +395,6 @@ const CarGame = () => {
 
                 if (gameState === 'PLAYING') {
                     const carPos = carRef.current.position;
-                    // CHECK COIN COLLISIONS
                     for (let i = coins.current.length - 1; i >= 0; i--) {
                         const coin = coins.current[i];
                         const coinWorldPos = new THREE.Vector3();
@@ -419,7 +406,6 @@ const CarGame = () => {
                             coins.current.splice(i, 1);
                         }
                     }
-                    // CHECK FIRE COLLISIONS
                     for (let i = fires.current.length - 1; i >= 0; i--) {
                         const fire = fires.current[i];
                         const fireWorldPos = new THREE.Vector3();
@@ -444,35 +430,15 @@ const CarGame = () => {
         return () => cancelAnimationFrame(animationRef.current);
     }, [gameState]);
 
-    // TIMER LOGIC
     useEffect(() => {
         let interval;
-        if (gameState === 'COUNTDOWN') {
-            interval = setInterval(() => {
-                setCountDown(prev => {
-                    if (prev <= 1) return 0; // Will trigger effect below
-                    return prev - 1;
-                });
-            }, 1000);
-        } else if (gameState === 'PLAYING') {
-            interval = setInterval(() => {
-                setTimeLeft(prev => {
-                    if (prev <= 1) {
-                        setGameState('GAME_OVER');
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
+        if (gameState === 'COUNTDOWN') interval = setInterval(() => setCountDown(p => p === 1 ? (setGameState('PLAYING'), 0) : p - 1), 1000);
+        else if (gameState === 'PLAYING') interval = setInterval(() => setTimeLeft(p => p <= 0 ? (setGameState('GAME_OVER'), 0) : p - 1), 1000);
         return () => clearInterval(interval);
     }, [gameState]);
 
-    // COUNTDOWN TRANSITION
     useEffect(() => {
-        if (gameState === 'COUNTDOWN' && countDown === 0) {
-            setGameState('PLAYING');
-        }
+        if (gameState === 'COUNTDOWN' && countDown === 0) setGameState('PLAYING');
     }, [countDown, gameState]);
 
     const handleStart = (action) => activeKeys.current[action] = true;
@@ -496,58 +462,51 @@ const CarGame = () => {
         return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); };
     }, []);
 
-    const Btn = ({ icon, action, color }) => (
+    const Btn = ({ icon, action }) => (
         <button
             onMouseDown={() => handleStart(action)}
             onMouseUp={() => handleEnd(action)}
             onMouseLeave={() => handleEnd(action)}
             onTouchStart={(e) => { e.preventDefault(); handleStart(action); }}
             onTouchEnd={(e) => { e.preventDefault(); handleEnd(action); }}
-            className={`w-20 h-20 rounded-2xl font-bold text-white text-3xl shadow-[0_0_15px_rgba(0,255,255,0.5)] active:scale-95 transition-all flex items-center justify-center border-2 border-cyan-400/50 backdrop-blur-md bg-black/60 hover:bg-cyan-500/20 active:bg-cyan-400 active:text-black active:shadow-[0_0_25px_rgba(0,255,255,0.8)]`}
+            className={`w-14 h-14 md:w-20 md:h-20 rounded-2xl font-bold text-white text-2xl md:text-3xl shadow-[0_0_15px_rgba(0,255,255,0.5)] active:scale-95 transition-all flex items-center justify-center border-2 border-cyan-400/50 backdrop-blur-md bg-black/60 hover:bg-cyan-500/20 active:bg-cyan-400 active:text-black active:shadow-[0_0_25px_rgba(0,255,255,0.8)]`}
         >
             {icon}
         </button>
     );
 
     return (
-        <div className="relative w-screen h-screen bg-slate-800 overflow-hidden font-sans select-none">
+        <div className="relative w-screen h-screen bg-slate-800 overflow-hidden font-sans select-none touch-none">
             <canvas ref={canvasRef} className="block w-full h-full" />
 
-            {/* START UI */}
+            {/* START UI - MOBILE OPTIMIZED */}
             {gameState === 'START' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-xl z-50">
-                    <h1 className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-6 drop-shadow-[0_0_15px_rgba(0,255,255,0.5)] italic tracking-tighter">
-                        TWILIGHT <span className="text-white">RACER</span>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-xl z-50 px-4">
+                    <h1 className="text-5xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-6 drop-shadow-[0_0_15px_rgba(0,255,255,0.5)] italic tracking-tighter text-center leading-none">
+                        TWILIGHT <br className="md:hidden" /><span className="text-white">RACER</span>
                     </h1>
 
-                    {/* DIGITAL PANEL */}
-                    <div className="bg-black/40 p-10 rounded-3xl shadow-[0_0_30px_rgba(0,0,0,0.5)] text-center mb-10 border border-cyan-500/30 backdrop-blur-md relative overflow-hidden group">
+                    <div className="bg-black/40 p-6 md:p-10 rounded-2xl shadow-[0_0_30px_rgba(0,0,0,0.5)] text-center mb-8 border border-cyan-500/30 backdrop-blur-md relative overflow-hidden group w-full max-w-sm md:max-w-xl">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50"></div>
-                        <p className="text-cyan-400 text-2xl font-bold mb-2 tracking-widest font-mono">SYSTEM READY</p>
-                        <p className="text-slate-400 font-mono text-sm">Feel the speed of the night</p>
+                        <p className="text-cyan-400 text-lg md:text-2xl font-bold mb-2 tracking-widest font-mono">SYSTEM READY</p>
+                        <p className="text-slate-400 font-mono text-xs md:text-sm">Feel the speed of the night</p>
                     </div>
 
-                    {/* AUDIO STATUS INDICATOR */}
                     {!audioEnabled && (
                         <div className="mb-8 animate-pulse cursor-pointer" onClick={enableAudio}>
-                            <span className="bg-red-500/20 border border-red-500 text-red-400 px-6 py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(255,0,0,0.3)] flex items-center gap-3 backdrop-blur-sm">
-                                <FaVolumeMute className="text-2xl" /> TAP TO INITIALIZE AUDIO
+                            <span className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-2 md:px-6 md:py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(255,0,0,0.3)] flex items-center gap-2 md:gap-3 backdrop-blur-sm text-sm md:text-base">
+                                <FaVolumeMute className="text-lg md:text-2xl" /> TAP TO PLAY SOUND
                             </span>
                         </div>
                     )}
 
-                    {/* START BUTTON */}
                     <button onClick={() => {
                         setGameState('COUNTDOWN');
-                        setLives(3);
-                        setScore(0);
-                        setTimeLeft(180);
-                        setCountDown(3);
-                        speedRef.current = 0;
-                        activeKeys.current = {};
+                        setLives(3); setScore(0); setTimeLeft(180); setCountDown(3);
+                        speedRef.current = 0; activeKeys.current = {};
                     }}
-                        className="group relative px-20 py-8 bg-cyan-600/20 text-cyan-400 text-4xl font-black rounded-xl border-2 border-cyan-400/50 shadow-[0_0_20px_rgba(0,255,255,0.2)] hover:bg-cyan-400 hover:text-black hover:scale-105 hover:shadow-[0_0_40px_rgba(0,255,255,0.6)] transition-all overflow-hidden">
-                        <span className="relative z-10 flex items-center gap-4">
+                        className="group relative px-10 py-5 md:px-20 md:py-8 bg-cyan-600/20 text-cyan-400 text-xl md:text-4xl font-black rounded-xl border-2 border-cyan-400/50 shadow-[0_0_20px_rgba(0,255,255,0.2)] hover:bg-cyan-400 hover:text-black hover:scale-105 hover:shadow-[0_0_40px_rgba(0,255,255,0.6)] transition-all overflow-hidden w-full max-w-xs md:max-w-none">
+                        <span className="relative z-10 flex items-center justify-center gap-3 md:gap-4">
                             <FaPlay /> START ENGINE
                         </span>
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1s_infinite]"></div>
@@ -558,40 +517,36 @@ const CarGame = () => {
             {/* COUNTDOWN */}
             {gameState === 'COUNTDOWN' && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-50 bg-black/20 backdrop-blur-sm">
-                    {/* Changed animate-ping to animate-bounce to avoid ghosting issues */}
-                    <div className="text-[15rem] font-black text-cyan-400 drop-shadow-[0_0_50px_rgba(0,255,255,0.8)] font-mono animate-bounce">
+                    <div className="text-[10rem] md:text-[15rem] font-black text-cyan-400 drop-shadow-[0_0_50px_rgba(0,255,255,0.8)] font-mono animate-bounce">
                         {countDown > 0 ? countDown : "GO!"}
                     </div>
                 </div>
             )}
 
-            {/* HUD */}
+            {/* HUD - SCALED FOR MOBILE */}
             {gameState !== 'START' && (
                 <>
-                    <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-start pointer-events-none">
-                        <div className="flex flex-col gap-3">
-                            {/* SCORE */}
-                            <div className="bg-black/60 px-8 py-4 rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.5)] flex gap-4 items-center border-l-4 border-cyan-400 backdrop-blur-md">
-                                <span className="text-4xl text-yellow-400 drop-shadow-md"><GiTrophyCup /></span>
-                                <span className="text-5xl font-black text-white font-mono tracking-wider">{score.toString().padStart(4, '0')}</span>
+                    <div className="absolute top-0 left-0 w-full p-4 md:p-6 flex justify-between items-start pointer-events-none z-40">
+                        <div className="flex flex-col gap-2 md:gap-3 scale-90 origin-top-left md:scale-100">
+                            <div className="bg-black/60 px-4 py-2 md:px-8 md:py-4 rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.5)] flex gap-2 md:gap-4 items-center border-l-4 border-cyan-400 backdrop-blur-md">
+                                <span className="text-2xl md:text-4xl text-yellow-400 drop-shadow-md"><GiTrophyCup /></span>
+                                <span className="text-3xl md:text-5xl font-black text-white font-mono tracking-wider">{score.toString().padStart(4, '0')}</span>
                             </div>
-                            {/* LIVES */}
-                            <div className="flex gap-2 pl-2">
+                            <div className="flex gap-1 md:gap-2 pl-1 md:pl-2">
                                 {[...Array(3)].map((_, i) => (
-                                    <span key={i} className={`text-4xl transition-all drop-shadow-lg ${i < lives ? 'text-red-500 scale-100' : 'text-gray-600 scale-90 opacity-50'}`}>
+                                    <span key={i} className={`text-2xl md:text-4xl transition-all drop-shadow-lg ${i < lives ? 'text-red-500 scale-100' : 'text-gray-600 scale-90 opacity-50'}`}>
                                         <div className="bg-white rounded-full p-1"><FaArrowUp className="rotate-0 text-transparent" />❤️</div>
                                     </span>
                                 ))}
                             </div>
                         </div>
-                        {/* TIMER */}
-                        <div className={`bg-black/60 text-white px-8 py-3 rounded-xl text-5xl font-black font-mono shadow-[0_0_15px_rgba(0,0,0,0.5)] border-r-4 ${timeLeft < 30 ? 'border-red-500 text-red-400 animate-pulse' : 'border-cyan-400'} backdrop-blur-md`}>
+                        <div className={`bg-black/60 text-white px-4 py-2 md:px-8 md:py-3 rounded-xl text-3xl md:text-5xl font-black font-mono shadow-[0_0_15px_rgba(0,0,0,0.5)] border-r-4 ${timeLeft < 30 ? 'border-red-500 text-red-400 animate-pulse' : 'border-cyan-400'} backdrop-blur-md scale-90 origin-top-right md:scale-100`}>
                             {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
                         </div>
                     </div>
 
                     {gameState === 'PLAYING' && (
-                        <div className="absolute bottom-8 left-0 w-full px-10 flex justify-between items-end pb-safe">
+                        <div className="absolute bottom-6 left-0 w-full px-6 flex justify-between items-end pb-safe z-50 md:bottom-10 md:px-10">
                             <div className="flex gap-4">
                                 <Btn icon={<FaArrowLeft />} action="left" />
                                 <Btn icon={<FaArrowRight />} action="right" />
@@ -607,17 +562,17 @@ const CarGame = () => {
 
             {/* GAME OVER */}
             {gameState === 'GAME_OVER' && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-xl z-50">
-                    <h1 className={`text-9xl font-black mb-8 drop-shadow-[0_0_30px_rgba(0,0,0,0.5)] italic ${lives > 0 ? 'text-green-400' : 'text-red-500'}`}>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-xl z-50 px-4 text-center">
+                    <h1 className={`text-5xl md:text-9xl font-black mb-6 md:mb-8 drop-shadow-[0_0_30px_rgba(0,0,0,0.5)] italic ${lives > 0 ? 'text-green-400' : 'text-red-500'}`}>
                         {lives > 0 ? "MISSION ACCOMPLISHED" : "SYSTEM FAILURE"}
                     </h1>
-                    <div className="bg-black/50 p-12 rounded-3xl border border-white/10 backdrop-blur-md text-center mb-10 shadow-2xl">
-                        <div className="text-2xl text-cyan-200 font-mono mb-4">FINAL SCORE</div>
-                        <div className="text-8xl text-white font-black font-mono tracking-widest drop-shadow-[0_0_20px_rgba(0,255,255,0.5)]">
+                    <div className="bg-black/50 p-8 md:p-12 rounded-3xl border border-white/10 backdrop-blur-md mb-8 md:mb-10 shadow-2xl w-full max-w-xs md:max-w-none">
+                        <div className="text-xl md:text-2xl text-cyan-200 font-mono mb-2 md:mb-4">FINAL SCORE</div>
+                        <div className="text-6xl md:text-8xl text-white font-black font-mono tracking-widest drop-shadow-[0_0_20px_rgba(0,255,255,0.5)]">
                             {score.toString().padStart(5, '0')}
                         </div>
                     </div>
-                    <button onClick={() => setGameState('START')} className="px-16 py-6 bg-white text-black text-3xl font-black rounded-full hover:scale-110 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.5)] flex items-center gap-4">
+                    <button onClick={() => setGameState('START')} className="px-10 py-4 md:px-16 md:py-6 bg-white text-black text-xl md:text-3xl font-black rounded-full hover:scale-110 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.5)] flex items-center gap-3 md:gap-4">
                         <FaRedo /> REBOOT SYSTEM
                     </button>
                 </div>
