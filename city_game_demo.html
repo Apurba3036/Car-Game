@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Racer - Interactive Three.js Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ffff;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #00ffff;
+            pointer-events: none;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+
+        .stat {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #aaa;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        kbd {
+            background: #444;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="hud">
+        <div class="label">Cyber-Score</div>
+        <div id="score" class="stat">0000</div>
+        <div class="label">Speed</div>
+        <div id="speed" class="stat">0 km/h</div>
+        <button id="respawnBtn"
+            style="margin-top: 15px; background: #00ffff; color: black; border: none; padding: 10px; width: 100%; font-weight: bold; border-radius: 5px; cursor: pointer; pointer-events: auto;">RESPAWN
+            (R)</button>
+    </div>
+
+    <div id="instructions">
+        Use <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or <kbd>ARROWS</kbd> to Drive | Press <kbd>R</kbd> if
+        Stuck
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // 1. SETUP SCENE
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020205);
+        scene.fog = new THREE.FogExp2(0x020205, 0.003);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // 2. PLAYER (The Car)
+        const car = new THREE.Group();
+        const body = new THREE.Mesh(
+            new THREE.BoxGeometry(2, 1, 4),
+            new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 })
+        );
+        body.position.y = 0.5;
+        car.add(body);
+
+        // Headlights
+        const lightL = new THREE.SpotLight(0xffffff, 50);
+        lightL.position.set(-0.8, 0.5, 2);
+        lightL.target.position.set(-0.8, 0, 10);
+        car.add(lightL);
+        car.add(lightL.target);
+
+        const lightR = new THREE.SpotLight(0xffffff, 50);
+        lightR.position.set(0.8, 0.5, 2);
+        lightR.target.position.set(0.8, 0, 10);
+        car.add(lightR);
+        car.add(lightR.target);
+
+        scene.add(car);
+
+        // 3. WORLD GENERATION (Simplified for the game)
+        const CITY_SIZE = 1000;
+        const GRID_SIZE = 60;
+        const buildings = [];
+        const collectibles = [];
+
+        // Ground
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(CITY_SIZE, CITY_SIZE),
+            new THREE.MeshStandardMaterial({ color: 0x111111 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Roads Grid
+        for (let i = -CITY_SIZE / 2; i <= CITY_SIZE / 2; i += GRID_SIZE) {
+            const roadV = new THREE.Mesh(new THREE.PlaneGeometry(12, CITY_SIZE), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            roadV.rotation.x = -Math.PI / 2;
+            roadV.position.set(i, 0.01, 0);
+            scene.add(roadV);
+
+            const roadH = new THREE.Mesh(new THREE.PlaneGeometry(CITY_SIZE, 12), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            roadH.rotation.x = -Math.PI / 2;
+            roadH.position.set(0, 0.01, i);
+            scene.add(roadH);
+        }
+
+        // Procedural Buildings with Collision boxes
+        function spawnBuildings() {
+            const geo = new THREE.BoxGeometry(1, 1, 1);
+            for (let x = -CITY_SIZE / 2 + 30; x < CITY_SIZE / 2; x += GRID_SIZE) {
+                for (let z = -CITY_SIZE / 2 + 30; z < CITY_SIZE / 2; z += GRID_SIZE) {
+                    const h = 20 + Math.random() * 100;
+                    const w = 20 + Math.random() * 10;
+                    const b = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x333344 }));
+                    b.scale.set(w, h, w);
+                    b.position.set(x, h / 2, z);
+                    b.castShadow = true;
+                    scene.add(b);
+
+                    // Add to collision array
+                    buildings.push({ x, z, w: w / 2 + 1.5 }); // Radius for simple AABB
+                }
+            }
+        }
+        spawnBuildings();
+
+        // Neon Orbs (Collectibles)
+        function spawnOrbs() {
+            const orbGeo = new THREE.SphereGeometry(1.5, 16, 16);
+            const orbMat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
+            for (let i = 0; i < 50; i++) {
+                const orb = new THREE.Mesh(orbGeo, orbMat);
+                // Position on roads
+                const x = Math.round((Math.random() - 0.5) * CITY_SIZE / GRID_SIZE) * GRID_SIZE;
+                const z = (Math.random() - 0.5) * CITY_SIZE;
+                orb.position.set(x, 2, z);
+                scene.add(orb);
+                collectibles.push(orb);
+            }
+        }
+        spawnOrbs();
+
+        // 4. LIGHTING
+        scene.add(new THREE.AmbientLight(0x404040, 0.5));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
+        sun.position.set(50, 100, 50);
+        sun.castShadow = true;
+        scene.add(sun);
+
+        // 5. GAME LOGIC & CONTROLS
+        let score = 0;
+        let speed = 0;
+        const keys = {};
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        const velocity = new THREE.Vector3();
+        let rotation = 0;
+
+        function resetPlayer() {
+            car.position.set(0, 0, 0);
+            rotation = 0;
+            speed = 0;
+            velocity.set(0, 0, 0);
+            camera.position.set(0, 10, -20);
+        }
+
+        document.getElementById('respawnBtn').addEventListener('click', resetPlayer);
+
+        function updateGame() {
+            // Player Input
+            if (keys['KeyR']) resetPlayer();
+
+            if (keys['KeyW'] || keys['ArrowUp']) speed = Math.min(speed + 0.05, 2.5);
+            else if (keys['KeyS'] || keys['ArrowDown']) speed = Math.max(speed - 0.1, -1);
+            else speed *= 0.95; // Friction
+
+            if (Math.abs(speed) > 0.1) {
+                const dir = (speed > 0) ? 1 : -1;
+                if (keys['KeyA'] || keys['ArrowLeft']) rotation += 0.04 * dir;
+                if (keys['KeyD'] || keys['ArrowRight']) rotation -= 0.04 * dir;
+            }
+
+            // Move Car
+            car.rotation.y = rotation;
+            const moveX = Math.sin(rotation) * speed;
+            const moveZ = Math.cos(rotation) * speed;
+
+            // Simple Collision Check
+            let collision = false;
+            const nextX = car.position.x + moveX;
+            const nextZ = car.position.z + moveZ;
+
+            for (let b of buildings) {
+                const dx = nextX - b.x;
+                const dz = nextZ - b.z;
+                if (Math.abs(dx) < b.w && Math.abs(dz) < b.w) {
+                    collision = true;
+                    speed = -speed * 0.5; // Bounce back
+                    break;
+                }
+            }
+
+            if (!collision) {
+                car.position.x += moveX;
+                car.position.z += moveZ;
+            }
+
+            // Camera Follow (Cinematic)
+            const camOffset = new THREE.Vector3(Math.sin(rotation) * -20, 10, Math.cos(rotation) * -20);
+            camera.position.lerp(car.position.clone().add(camOffset), 0.1);
+            camera.lookAt(car.position);
+
+            // Collect Orbs
+            for (let i = collectibles.length - 1; i >= 0; i--) {
+                const orb = collectibles[i];
+                if (car.position.distanceTo(orb.position) < 5) {
+                    scene.remove(orb);
+                    collectibles.splice(i, 1);
+                    score += 100;
+                    document.getElementById('score').innerText = score.toString().padStart(4, '0');
+                }
+            }
+
+            // Update HUD
+            document.getElementById('speed').innerText = Math.round(Math.abs(speed) * 40) + " km/h";
+        }
+
+        // 6. ANIMATION LOOP
+        function animate() {
+            requestAnimationFrame(animate);
+            updateGame();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+
+</html>

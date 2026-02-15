@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js City Architect - Detailed 3D Demo</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            pointer-events: none;
+            backdrop-blur: 5px;
+        }
+
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 18px;
+            color: #00ffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        p {
+            margin: 5px 0;
+            font-size: 13px;
+            color: #ccc;
+        }
+
+        kbd {
+            background: #333;
+            padding: 2px 5px;
+            border-radius: 3px;
+            color: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+        <h1>City Architect</h1>
+        <p><b>Controls:</b> <kbd>LMB</kbd> Rotate | <kbd>RMB</kbd> Pan | <kbd>Scroll</kbd> Zoom</p>
+        <p>Procedural generation: Built with <b>Three.js</b></p>
+    </div>
+
+    <!-- Three.js Library and OrbitControls via CDN -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // ------------------------------------------------
+        // 1. INITIALIZATION
+        // ------------------------------------------------
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020205);
+        scene.fog = new THREE.FogExp2(0x020205, 0.002);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(100, 100, 100);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.maxDistance = 600;
+
+        // ------------------------------------------------
+        // 2. GROUND & ROAD LAYOUT
+        // ------------------------------------------------
+        const CITY_SIZE = 500;
+        const GRID_SIZE = 50;
+        const ROAD_WIDTH = 10;
+
+        // Ground Plane (Asphalt look)
+        const groundGeo = new THREE.PlaneGeometry(CITY_SIZE, CITY_SIZE);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Road Grid
+        function createRoads() {
+            const roadMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+            for (let i = -CITY_SIZE / 2; i <= CITY_SIZE / 2; i += GRID_SIZE) {
+                // Vertical Roads
+                const roadV = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_WIDTH, CITY_SIZE), roadMat);
+                roadV.rotation.x = -Math.PI / 2;
+                roadV.position.set(i, 0.01, 0);
+                roadV.receiveShadow = true;
+                scene.add(roadV);
+
+                // Horizontal Roads
+                const roadH = new THREE.Mesh(new THREE.PlaneGeometry(CITY_SIZE, ROAD_WIDTH), roadMat);
+                roadH.rotation.x = -Math.PI / 2;
+                roadH.position.set(0, 0.01, i);
+                roadH.receiveShadow = true;
+                scene.add(roadH);
+
+                // Road Markings (Simple white dashes)
+                for (let j = -CITY_SIZE / 2; j <= CITY_SIZE / 2; j += 20) {
+                    const markV = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 5), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                    markV.rotation.x = -Math.PI / 2;
+                    markV.position.set(i, 0.02, j);
+                    scene.add(markV);
+
+                    const markH = new THREE.Mesh(new THREE.PlaneGeometry(5, 0.5), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                    markH.rotation.x = -Math.PI / 2;
+                    markH.position.set(j, 0.02, i);
+                    scene.add(markH);
+                }
+            }
+        }
+        createRoads();
+
+        // ------------------------------------------------
+        // 3. PROCEDURAL BUILDINGS
+        // ------------------------------------------------
+        function createCity() {
+            const box = new THREE.BoxGeometry(1, 1, 1);
+
+            // Building Materials
+            const materials = [
+                new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.2, metalness: 0.5 }),
+                new THREE.MeshStandardMaterial({ color: 0x666677, roughness: 0.5, metalness: 0.2 }),
+                new THREE.MeshStandardMaterial({ color: 0x333344, roughness: 0.1, metalness: 0.8 })
+            ];
+
+            for (let x = -CITY_SIZE / 2 + GRID_SIZE / 2; x < CITY_SIZE / 2; x += GRID_SIZE) {
+                for (let z = -CITY_SIZE / 2 + GRID_SIZE / 2; z < CITY_SIZE / 2; z += GRID_SIZE) {
+                    // Avoid spawning directly on roads
+                    if (Math.abs(x % GRID_SIZE) < ROAD_WIDTH / 2 || Math.abs(z % GRID_SIZE) < ROAD_WIDTH / 2) continue;
+
+                    // Random building params
+                    const height = 10 + Math.random() * 80;
+                    const width = 20 + Math.random() * 15;
+                    const depth = 20 + Math.random() * 15;
+                    const style = Math.floor(Math.random() * materials.length);
+
+                    const building = new THREE.Mesh(box, materials[style]);
+                    building.scale.set(width, height, depth);
+                    building.position.set(x, height / 2, z);
+                    building.castShadow = true;
+                    building.receiveShadow = true;
+                    scene.add(building);
+
+                    // Optional: Windows (simple emissive planes)
+                    if (Math.random() > 0.3) {
+                        const winGeo = new THREE.BoxGeometry(width + 0.2, height * 0.8, depth + 0.2);
+                        const winMat = new THREE.MeshBasicMaterial({
+                            color: 0x88CCFF,
+                            transparent: true,
+                            opacity: 0.1,
+                            wireframe: true
+                        });
+                        const windows = new THREE.Mesh(winGeo, winMat);
+                        windows.position.set(x, height / 2, z);
+                        scene.add(windows);
+                    }
+
+                    // Rooftop Details
+                    if (Math.random() > 0.5) {
+                        const vent = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 5), materials[0]);
+                        vent.position.set(x + (Math.random() - 0.5) * 10, height + 1.5, z + (Math.random() - 0.5) * 10);
+                        scene.add(vent);
+                    }
+                }
+            }
+        }
+        createCity();
+
+        // ------------------------------------------------
+        // 4. ENVIRONMENTAL ELEMENTS (Lamps & Trees)
+        // ------------------------------------------------
+        function addEnvironment() {
+            // Street Lamps
+            for (let i = -CITY_SIZE / 2; i <= CITY_SIZE / 2; i += GRID_SIZE) {
+                for (let j = -CITY_SIZE / 2; j <= CITY_SIZE / 2; j += GRID_SIZE) {
+                    if (Math.random() > 0.6) {
+                        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 15), new THREE.MeshStandardMaterial({ color: 0x333 }));
+                        pole.position.set(i + 8, 7.5, j + 8);
+                        scene.add(pole);
+
+                        const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshBasicMaterial({ color: 0xffffaa }));
+                        bulb.position.set(i + 8, 15, j + 8);
+                        scene.add(bulb);
+
+                        const light = new THREE.PointLight(0xffffaa, 100, 40);
+                        light.position.set(i + 8, 15, j + 8);
+                        scene.add(light);
+                    }
+                }
+            }
+
+            // Simple Low-Poly Trees
+            for (let k = 0; k < 100; k++) {
+                const x = (Math.random() - 0.5) * CITY_SIZE;
+                const z = (Math.random() - 0.5) * CITY_SIZE;
+
+                // Avoid roads
+                if (Math.abs(x % GRID_SIZE) < ROAD_WIDTH + 5 || Math.abs(z % GRID_SIZE) < ROAD_WIDTH + 5) continue;
+
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 5), new THREE.MeshStandardMaterial({ color: 0x4d2600 }));
+                trunk.position.set(x, 2.5, z);
+                scene.add(trunk);
+
+                const leaves = new THREE.Mesh(new THREE.ConeGeometry(3, 8), new THREE.MeshStandardMaterial({ color: 0x1a3300 }));
+                leaves.position.set(x, 8, z);
+                scene.add(leaves);
+            }
+        }
+        addEnvironment();
+
+        // ------------------------------------------------
+        // 5. LIGHTING
+        // ------------------------------------------------
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5); // Soft white light
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+        sunLight.position.set(100, 200, 100);
+        sunLight.castShadow = true;
+        // Optimize Shadow Map
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.left = -CITY_SIZE / 2;
+        sunLight.shadow.camera.right = CITY_SIZE / 2;
+        sunLight.shadow.camera.top = CITY_SIZE / 2;
+        sunLight.shadow.camera.bottom = -CITY_SIZE / 2;
+        scene.add(sunLight);
+
+        const moonLight = new THREE.DirectionalLight(0x4444ff, 0.3);
+        moonLight.position.set(-100, 50, -50);
+        scene.add(moonLight);
+
+        // ------------------------------------------------
+        // 6. ANIMATION LOOP & OPTIMIZATION
+        // ------------------------------------------------
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+        console.log("City Architect Initialized. Nodes:", scene.children.length);
+    </script>
+</body>
+
+</html>
