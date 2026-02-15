@@ -23,6 +23,8 @@ const CarGame = () => {
     const [countDown, setCountDown] = useState(3);
     const [zoneName, setZoneName] = useState('NATURE');
     const [showZoneNotify, setShowZoneNotify] = useState(false);
+    const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+    const [currentSpeed, setCurrentSpeed] = useState(0);
 
     // Refs
     const sceneRef = useRef(null);
@@ -309,38 +311,66 @@ const CarGame = () => {
 
         // NATURE PROPS
         if (envZone.current === 'NATURE' || envZone.current === 'TRANSITION') {
-            const numTrees = envZone.current === 'NATURE' ? 4 : 2;
-            for (let i = 0; i < numTrees; i++) {
-                const tree = new THREE.Group();
-                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 2), new THREE.MeshStandardMaterial({ color: 0x5C4033 }));
-                trunk.position.y = 1;
-                tree.add(trunk);
-                const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(2 + Math.random()), new THREE.MeshStandardMaterial({ color: 0x228B22, flatShading: true }));
-                leaves.position.y = 3;
-                tree.add(leaves);
-                tree.position.set(getSidePos(18, 50), 0, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
-                segmentGroup.add(tree);
+            if (envZone.current === 'NATURE') {
+                // BIG TREES
+                for (let i = 0; i < 4; i++) {
+                    const tree = new THREE.Group();
+                    const trunkH = 8 + Math.random() * 8;
+                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.8, trunkH), new THREE.MeshStandardMaterial({ color: 0x3d2b1f }));
+                    trunk.position.y = trunkH / 2;
+                    tree.add(trunk);
+
+                    for (let j = 0; j < 3; j++) {
+                        const leaves = new THREE.Mesh(
+                            new THREE.DodecahedronGeometry(4 - j + Math.random()),
+                            new THREE.MeshStandardMaterial({ color: 0x0a3d0a, flatShading: true })
+                        );
+                        leaves.position.y = trunkH + j * 2.5;
+                        tree.add(leaves);
+                    }
+                    tree.position.set(getSidePos(20, 70), 0, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                    segmentGroup.add(tree);
+                }
+
+                // SMALL COZY HOUSES
+                if (Math.random() > 0.4) {
+                    const house = new THREE.Group();
+                    const base = new THREE.Mesh(new THREE.BoxGeometry(8, 6, 8), new THREE.MeshStandardMaterial({ color: 0x5a3a22 }));
+                    base.position.y = 3;
+                    house.add(base);
+                    const roof = new THREE.Mesh(new THREE.ConeGeometry(7, 5, 4), new THREE.MeshStandardMaterial({ color: 0x883322 }));
+                    roof.position.y = 8.5;
+                    roof.rotation.y = Math.PI / 4;
+                    house.add(roof);
+                    // Light from windows
+                    const windowLight = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), new THREE.MeshBasicMaterial({ color: 0xffcc33 }));
+                    windowLight.position.set(0, 3.5, 4.05);
+                    house.add(windowLight);
+
+                    house.position.set(getSidePos(30, 60), 0, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                    house.rotation.y = Math.random() * Math.PI;
+                    segmentGroup.add(house);
+                }
+            } else {
+                // Transition Trees
+                for (let i = 0; i < 2; i++) {
+                    const tree = new THREE.Group();
+                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 4), new THREE.MeshStandardMaterial({ color: 0x5C4033 }));
+                    trunk.position.y = 2;
+                    tree.add(trunk);
+                    const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(2.5), new THREE.MeshStandardMaterial({ color: 0x228B22, flatShading: true }));
+                    leaves.position.y = 4.5;
+                    tree.add(leaves);
+                    tree.position.set(getSidePos(18, 50), 0, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                    segmentGroup.add(tree);
+                }
             }
 
-            // Bushes
+            // Bushes & Rocks
             for (let i = 0; i < 3; i++) {
-                const bush = new THREE.Mesh(
-                    new THREE.DodecahedronGeometry(0.8 + Math.random() * 0.5),
-                    new THREE.MeshStandardMaterial({ color: 0x1a5e1a, flatShading: true })
-                );
+                const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2), new THREE.MeshStandardMaterial({ color: 0x1a5e1a, flatShading: true }));
                 bush.position.set(getSidePos(14, 25), 0.5, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
                 segmentGroup.add(bush);
-            }
-
-            // Rocks
-            if (Math.random() > 0.5) {
-                const rock = new THREE.Mesh(
-                    new THREE.IcosahedronGeometry(1.5, 0),
-                    new THREE.MeshStandardMaterial({ color: 0x888888, flatShading: true })
-                );
-                rock.position.set(getSidePos(20, 35), 0.5, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
-                rock.rotation.set(Math.random(), Math.random(), Math.random());
-                segmentGroup.add(rock);
             }
         }
 
@@ -400,9 +430,50 @@ const CarGame = () => {
                     const w = 15 + Math.random() * 15;
                     const b = new THREE.Mesh(
                         new THREE.BoxGeometry(w, h, w),
-                        new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 0.3, metalness: 0.7 })
+                        new THREE.MeshStandardMaterial({ color: 0x112233, roughness: 0.3, metalness: 0.8 })
                     );
-                    b.position.set(getSidePos(40, 100), h / 2 - 2, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+                    const bX = getSidePos(40, 100);
+                    b.position.set(bX, h / 2 - 2, Math.random() * SEGMENT_LENGTH - SEGMENT_LENGTH / 2);
+
+                    // Add holographic screens / banners to buildings
+                    const colors = [0x00ffff, 0xff00ff, 0xffff00, 0x00ff00, 0xff0000];
+                    const sideSign = bX > 0 ? -1 : 1; // Face the road
+
+                    // Big Screen
+                    if (Math.random() > 0.3) {
+                        const sW = w * 0.7;
+                        const sH = h * 0.3;
+                        const screen = new THREE.Mesh(
+                            new THREE.PlaneGeometry(sW, sH),
+                            new THREE.MeshBasicMaterial({ color: colors[Math.floor(Math.random() * colors.length)], side: THREE.DoubleSide })
+                        );
+                        screen.position.set(sideSign * (w / 2 + 0.1), Math.random() * (h / 2) - h / 4, 0);
+                        screen.rotation.y = Math.PI / 2;
+                        b.add(screen);
+
+                        // Subtle glow frame
+                        const frame = new THREE.Mesh(
+                            new THREE.PlaneGeometry(sW + 1, sH + 1),
+                            new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.2, transparent: true })
+                        );
+                        frame.position.set(sideSign * (w / 2 + 0.05), screen.position.y, 0);
+                        frame.rotation.y = Math.PI / 2;
+                        b.add(frame);
+                    }
+
+                    // Vertical Banner
+                    if (Math.random() > 0.4) {
+                        const banW = 2;
+                        const banH = h * 0.6;
+                        const banner = new THREE.Mesh(
+                            new THREE.PlaneGeometry(banW, banH),
+                            new THREE.MeshBasicMaterial({ color: colors[Math.floor(Math.random() * colors.length)], side: THREE.DoubleSide })
+                        );
+                        banner.position.set(sideSign * (w / 2 + 0.2), 0, (Math.random() - 0.5) * w * 0.5);
+                        banner.rotation.y = Math.PI / 2;
+                        b.add(banner);
+                    }
+
                     segmentGroup.add(b);
                 }
             }
@@ -450,9 +521,9 @@ const CarGame = () => {
 
         const animate = () => {
             if (gameState === 'COUNTDOWN' || gameState === 'PLAYING') {
-                if (gameState === 'PLAYING') {
-                    if (activeKeys.current['front']) speedRef.current = Math.min(speedRef.current + 0.05, CAR_SPEED_MAX);
-                    else if (activeKeys.current['back']) speedRef.current = Math.max(speedRef.current - 0.1, 0);
+                if (gameState === 'PLAYING' && !showQuitConfirm) {
+                    if (activeKeys.current['brake']) speedRef.current = Math.max(speedRef.current - 0.15, 0);
+                    else if (activeKeys.current['front']) speedRef.current = Math.min(speedRef.current + 0.05, CAR_SPEED_MAX);
                     else speedRef.current *= 0.96;
 
                     const steerSpeed = 0.9;
@@ -514,6 +585,7 @@ const CarGame = () => {
                             fires.current.splice(i, 1);
                         }
                     }
+                    setCurrentSpeed(Math.round(speedRef.current * 100));
                 }
             }
             if (composerRef.current) composerRef.current.render();
@@ -526,7 +598,7 @@ const CarGame = () => {
     useEffect(() => {
         let interval;
         if (gameState === 'COUNTDOWN') interval = setInterval(() => setCountDown(p => p === 1 ? (setGameState('PLAYING'), 0) : p - 1), 1000);
-        else if (gameState === 'PLAYING') {
+        else if (gameState === 'PLAYING' && !showQuitConfirm) {
             interval = setInterval(() => {
                 setTimeLeft(p => {
                     const next = p - 1;
@@ -577,27 +649,27 @@ const CarGame = () => {
             if (e.key.match(/ArrowLeft|a/i)) handleStart('left');
             if (e.key.match(/ArrowRight|d/i)) handleStart('right');
             if (e.key.match(/ArrowUp|w/i)) handleStart('front');
-            if (e.key.match(/ArrowDown|s/i)) handleStart('back');
+            if (e.key.match(/ArrowDown|s/i)) handleStart('brake');
         };
         const ku = (e) => {
             if (e.key.match(/ArrowLeft|a/i)) handleEnd('left');
             if (e.key.match(/ArrowRight|d/i)) handleEnd('right');
             if (e.key.match(/ArrowUp|w/i)) handleEnd('front');
-            if (e.key.match(/ArrowDown|s/i)) handleEnd('back');
+            if (e.key.match(/ArrowDown|s/i)) handleEnd('brake');
         };
         window.addEventListener('keydown', kd);
         window.addEventListener('keyup', ku);
         return () => { window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku); };
     }, []);
 
-    const Btn = ({ icon, action }) => (
+    const Btn = ({ icon, action, isBrake }) => (
         <button
             onMouseDown={() => handleStart(action)}
             onMouseUp={() => handleEnd(action)}
             onMouseLeave={() => handleEnd(action)}
-            onTouchStart={(e) => { e.preventDefault(); handleStart(action); }}
-            onTouchEnd={(e) => { e.preventDefault(); handleEnd(action); }}
-            className={`w-14 h-14 md:w-20 md:h-20 rounded-2xl font-bold text-white text-2xl md:text-3xl shadow-[0_0_15px_rgba(0,255,255,0.5)] active:scale-95 transition-all flex items-center justify-center border-2 border-cyan-400/50 backdrop-blur-md bg-black/60 hover:bg-cyan-500/20 active:bg-cyan-400 active:text-black active:shadow-[0_0_25px_rgba(0,255,255,0.8)]`}
+            onTouchStart={() => handleStart(action)}
+            onTouchEnd={() => handleEnd(action)}
+            className={`w-14 h-14 md:w-20 md:h-20 rounded-2xl font-bold text-white text-2xl md:text-3xl shadow-[0_0_15px_rgba(0,255,255,0.5)] active:scale-95 transition-all flex items-center justify-center border-2 border-cyan-400/50 backdrop-blur-md bg-black/60 hover:bg-cyan-500/20 active:bg-cyan-400 active:text-black active:shadow-[0_0_25px_rgba(0,255,255,0.8)] touch-none select-none ${isBrake ? 'bg-red-500/20 border-red-400/50' : ''}`}
         >
             {icon}
         </button>
@@ -733,8 +805,25 @@ const CarGame = () => {
                                 ))}
                             </div>
                         </div>
-                        <div className={`bg-black/60 text-white px-4 py-2 md:px-8 md:py-3 rounded-xl text-3xl md:text-5xl font-black font-mono shadow-[0_0_15px_rgba(0,0,0,0.5)] border-r-4 ${timeLeft < 30 ? 'border-red-500 text-red-400 animate-pulse' : 'border-cyan-400'} backdrop-blur-md scale-90 origin-top-right md:scale-100`}>
-                            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                        <div className="flex flex-col items-end gap-2 origin-top-right scale-90 md:scale-100">
+                            <div className={`bg-black/60 text-white px-4 py-2 md:px-8 md:py-3 rounded-xl text-3xl md:text-5xl font-black font-mono shadow-[0_0_15px_rgba(0,0,0,0.5)] border-r-4 ${timeLeft < 30 ? 'border-red-500 text-red-400 animate-pulse' : 'border-cyan-400'} backdrop-blur-md flex items-center gap-4`}>
+                                {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+                                <button
+                                    onClick={() => setShowQuitConfirm(true)}
+                                    className="ml-2 p-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-sm md:text-lg hover:bg-red-500 hover:text-white transition-all pointer-events-auto shadow-lg"
+                                >
+                                    QUIT
+                                </button>
+                            </div>
+
+                            {/* SPEEDOMETER */}
+                            <div className="bg-black/40 border border-white/10 px-4 py-2 rounded-xl backdrop-blur-sm shadow-xl flex items-baseline gap-2">
+                                <span className="text-white/40 font-mono text-[10px] uppercase tracking-widest">Velocity</span>
+                                <span className={`text-2xl md:text-4xl font-black font-mono tracking-tighter ${currentSpeed > 100 ? 'text-red-500' : currentSpeed > 60 ? 'text-yellow-400' : 'text-cyan-400'} drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]`}>
+                                    {currentSpeed.toString().padStart(3, '0')}
+                                </span>
+                                <span className="text-white/60 font-mono text-[10px]">KM/H</span>
+                            </div>
                         </div>
                     </div>
 
@@ -744,9 +833,43 @@ const CarGame = () => {
                                 <Btn icon={<FaArrowLeft />} action="left" />
                                 <Btn icon={<FaArrowRight />} action="right" />
                             </div>
-                            <div className="flex gap-4">
-                                <Btn icon={<FaArrowDown />} action="back" />
-                                <Btn icon={<FaArrowUp />} action="front" />
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="text-white/50 font-mono text-[10px] uppercase tracking-widest bg-black/40 px-3 py-1 rounded-full border border-white/10 mb-1">Pedals</div>
+                                <div className="flex gap-4">
+                                    <Btn icon={<div className="flex flex-col items-center"><div className="w-2 h-2 bg-white mb-1"></div>S</div>} action="brake" isBrake />
+                                    <Btn icon={<FaArrowUp />} action="front" />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* QUIT CONFIRMATION DIALOG */}
+                    {showQuitConfirm && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/80 backdrop-blur-xl z-[100] px-4">
+                            <div className="bg-slate-900 border-2 border-red-500/50 p-8 md:p-12 rounded-[2rem] shadow-[0_0_50px_rgba(239,68,68,0.3)] max-w-md w-full text-center animate-in zoom-in duration-300">
+                                <div className="w-20 h-20 bg-red-500/10 border-2 border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <FaArrowDown className="text-red-500 text-4xl rotate-180" />
+                                </div>
+                                <h3 className="text-3xl md:text-4xl font-black text-white mb-4 italic uppercase tracking-tighter">Exit Mission?</h3>
+                                <p className="text-slate-400 mb-8 font-mono text-sm leading-relaxed">Your progress in this sector will be lost. System will reboot to Zone Selection.</p>
+
+                                <div className="flex flex-col gap-4">
+                                    <button
+                                        onClick={() => setShowQuitConfirm(false)}
+                                        className="w-full py-4 bg-white text-black font-black text-xl rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-xl"
+                                    >
+                                        STAY & RACE
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowQuitConfirm(false);
+                                            setGameState('SELECT_ENV');
+                                        }}
+                                        className="w-full py-4 bg-red-500/10 border-2 border-red-500/50 text-red-500 font-black text-xl rounded-2xl hover:bg-red-500 hover:text-white transition-all"
+                                    >
+                                        QUIT TO ZONE
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
